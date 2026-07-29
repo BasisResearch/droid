@@ -35,7 +35,7 @@ class FrankaRobot:
     def launch_robot(self):
         self._robot = RobotInterface(ip_address="localhost")
         self._gripper = GripperInterface(ip_address="localhost")
-        self._max_gripper_width = self._gripper.metadata.max_width
+        self._max_gripper_width = 0.08  # self._gripper.metadata.max_width
         self._ik_solver = RobotIKSolver()
         self._controller_not_loaded = False
 
@@ -120,8 +120,34 @@ class FrankaRobot:
             command = gripper_delta + self.get_gripper_position()
 
         command = float(np.clip(command, 0, 1))
-        self._gripper.goto(width=self._max_gripper_width * (1 - command), speed=0.05, force=0.1, blocking=blocking)
+        # self._gripper.goto(width=self._max_gripper_width * (1 - command), speed=0.05, force=1.0, blocking=blocking)
+        width = self._max_gripper_width * (1 - command)
+        try:
+            w0 = self._gripper.get_state().width
+        except Exception:
+            w0 = float("nan")
+        print("[gripper] goto width=%.4fm (cmd=%.3f) blocking=%s  from width=%.4fm"
+              % (width, command, blocking, w0), flush=True)
+        self._gripper.goto(width=width, speed=0.05, force=5.0, blocking=blocking)
+        try:
+            print("[gripper] goto returned; width now=%.4fm"
+                  % self._gripper.get_state().width, flush=True)
+        except Exception:
+            pass
 
+    def stop_gripper(self, blocking=True):
+        # Unstick the gripper controller: after a grasp/goto that couldn't reach
+        # its target width (blocked by an object) the controller reports failure
+        # and IGNORES all future commands until stopped. Call this before the
+        # next goto/grasp. Requires GripperInterface.stop (fairo PR #1417).
+        try:
+            w0 = self._gripper.get_state().width
+        except:
+            w0 = float("nan")
+        print("[gripper] STOP blocking=%s  from width=%.4fm" % (blocking, w0), flush=True)
+        self._gripper.stop(blocking=blocking)
+        print("[gripper] STOP returned (unstick sent)", flush=True)
+          
     def add_noise_to_joints(self, original_joints, cartesian_noise):
         original_joints = torch.Tensor(original_joints)
 

@@ -113,15 +113,15 @@ done
 echo "You've selected: $interface_name"
 
 # Add and configure the static IP connection
-nmcli connection delete "nuc_static"
-nmcli connection add con-name "nuc_static" ifname "$interface_name" type ethernet
-nmcli connection modify "nuc_static" ipv4.method manual ipv4.address $NUC_IP/24
-nmcli connection up "nuc_static"
+#nmcli connection delete "nuc_static"
+#nmcli connection add con-name "nuc_static" ifname "$interface_name" type ethernet
+#nmcli connection modify "nuc_static" ipv4.method manual ipv4.address $NUC_IP/24
+#nmcli connection up "nuc_static"
 
-echo "Static IP configuration complete for interface $interface_name."
+#echo "Static IP configuration complete for interface $interface_name."
 
 # run control server container
 echo -e "8. run control server \n"
 
 DOCKER_COMPOSE_FILE="$(git rev-parse --show-toplevel)/.docker/nuc/docker-compose-nuc.yaml"
-docker compose -f $DOCKER_COMPOSE_FILE up -d
+docker-compose -f $DOCKER_COMPOSE_FILE up -d
