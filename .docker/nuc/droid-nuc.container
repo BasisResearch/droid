@@ -1,0 +1,34 @@
+# Quadlet container unit for the DROID NUC control server (Franka Panda).
+# Install (rootful): copy together with droid-nuc.build into
+# /etc/containers/systemd/, adjust the Volume= host path to the NUC's droid
+# checkout, then:
+#   systemctl daemon-reload && systemctl enable --now droid-nuc
+#
+# Mirrors docker-compose-nuc.yaml: host networking (zerorpc :4242, polymetis
+# gRPC :50051, libfranka out to the robot), SCHED_FIFO + mlockall for the
+# 1kHz control loop, and /dev/cpu_dma_latency to pin CPU C-states.
+
+[Unit]
+Description=DROID Franka Panda control server
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=droid-nuc
+Image=droid-nuc.build
+Network=host
+AddCapability=SYS_NICE
+AddDevice=/dev/cpu_dma_latency
+Ulimit=rtprio=99
+Ulimit=memlock=-1:-1
+# machine-specific runtime parameters (sudo password etc.)
+Volume=/home/robot/droid/droid/misc/parameters.py:/app/droid/misc/parameters.py
+StopTimeout=10
+
+[Service]
+Restart=always
+# must exceed StopTimeout so systemd doesn't kill podman mid-stop
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

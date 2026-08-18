@@ -7,6 +7,8 @@ This directory contains the Docker setups for the two machines on the platform: 
     ├──── docker-compose-nuc.yaml                # runtime contract (mounts, networking, RT limits)
     ├──── launch_robot.sh                        # container replacement for droid/franka/launch_robot.sh
     ├──── launch_gripper.sh                      # container replacement for droid/franka/launch_gripper.sh
+    ├──── droid-nuc.build                        # quadlet build unit (systemd-managed deployment)
+    ├──── droid-nuc.container                    # quadlet container unit (systemd-managed deployment)
     ├── laptop                                   # laptop docker setup files
     ├──── Dockerfile.laptop                      # laptop image definition
     ├──── docker-compose-laptop.yaml             # laptop container deployment settings
@@ -29,7 +31,8 @@ Submodules must be checked out before building: `git submodule update --init --r
 
 * **Mount:** `droid/misc/parameters.py` → `/app/droid/misc/parameters.py`. Machine-specific parameters, read at runtime (the server uses `sudo_password` to launch the real-time controller processes). Mounted so it can be edited without a rebuild.
 * **Host networking:** the laptop connects to the zerorpc server on port 4242 and to polymetis gRPC on 50051; libfranka connects out to the robot control box at its static IP.
-* **Real-time scheduling:** `privileged` together with `ulimits` `rtprio: 99` and `memlock` — required for the 1 kHz libfranka control loop. The host kernel must be RT-patched (see `scripts/setup/nuc_setup.sh`).
+* **Real-time scheduling:** `cap_add: SYS_NICE` plus `ulimits` `rtprio: 99` and `memlock: -1` — required for the 1 kHz libfranka control loop (SCHED_FIFO threads, and `mlockall` of the full libtorch-loaded process). The host kernel must be RT-patched (see `scripts/setup/nuc_setup.sh`).
+* **Device:** `/dev/cpu_dma_latency`, which the RT setup writes to pin CPU C-states — the only device node the stack touches; the robot and gripper are network clients. No `privileged` needed.
 * **`restart: always`** so the control server comes back up on boot.
 
 ## Build and run

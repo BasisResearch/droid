@@ -1,0 +1,18 @@
+# Quadlet build unit for the DROID NUC control server image (Franka Panda).
+# Install (rootful): copy together with droid-nuc.container into
+# /etc/containers/systemd/, adjust the two paths below to the NUC's droid
+# checkout, then: systemctl daemon-reload
+#
+# The build requires submodules to be checked out in the source tree:
+#   git submodule update --init --recursive
+# The build service runs when droid-nuc(.service) first starts after a boot
+# or daemon-reload; with a warm layer cache it completes in seconds. To force
+# a rebuild and redeploy: systemctl restart droid-nuc-build droid-nuc
+
+[Unit]
+Description=DROID NUC control server image build (Franka Panda)
+
+[Build]
+ImageTag=localhost/droid_nuc:panda
+File=/home/robot/droid/.docker/nuc/Dockerfile.nuc
+SetWorkingDirectory=/home/robot/droid

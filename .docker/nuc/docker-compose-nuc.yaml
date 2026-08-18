@@ -11,9 +11,15 @@ services:
     # host networking: the laptop connects to the zerorpc server on :4242 and
     # polymetis gRPC on :50051, and libfranka talks to the robot at its static IP
     network_mode: "host"
-    # real-time scheduling for the 1kHz libfranka control loop
-    privileged: true
+    # real-time scheduling for the 1kHz libfranka control loop: SCHED_FIFO
+    # needs SYS_NICE + rtprio; mlockall needs unlimited memlock (the process
+    # locks >1GB with libtorch loaded); the RT setup writes /dev/cpu_dma_latency
+    # to pin CPU C-states — the only device node the stack touches
+    cap_add:
+      - SYS_NICE
+    devices:
+      - /dev/cpu_dma_latency
     ulimits:
       rtprio: 99
-      memlock: 102400
+      memlock: -1
     restart: always
