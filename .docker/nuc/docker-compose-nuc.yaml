@@ -7,7 +7,7 @@ services:
     volumes:
       # machine-specific runtime parameters (sudo password etc.); everything
       # else the server needs is baked into the image
-      - ../../droid/misc/parameters.py:/app/droid/misc/parameters.py
+      - ../../droid/misc/parameters.py:/app/droid/misc/parameters.py:ro,Z
     # host networking: the laptop connects to the zerorpc server on :4242 and
     # polymetis gRPC on :50051, and libfranka talks to the robot at its static IP
     network_mode: "host"
@@ -19,6 +19,8 @@ services:
       - SYS_NICE
     devices:
       - /dev/cpu_dma_latency
+    # rootless-style isolation; needs a "containers" range in /etc/subuid+gid
+    userns_mode: "auto"
     ulimits:
       rtprio: 99
       memlock: -1

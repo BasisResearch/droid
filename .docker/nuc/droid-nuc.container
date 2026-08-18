@@ -17,12 +17,18 @@ After=network-online.target
 ContainerName=droid-nuc
 Image=droid-nuc.build
 Network=host
+# rootless-style isolation; SCHED_FIFO still works because RLIMIT_RTPRIO
+# authorizes it without CAP_SYS_NICE in the initial namespace, and podman
+# creates the device node owned by the mapped container root.
+# Requires a "containers" range in /etc/subuid and /etc/subgid.
+UserNS=auto
 AddCapability=SYS_NICE
 AddDevice=/dev/cpu_dma_latency
 Ulimit=rtprio=99
 Ulimit=memlock=-1:-1
-# machine-specific runtime parameters (sudo password etc.)
-Volume=/home/robot/droid/droid/misc/parameters.py:/app/droid/misc/parameters.py
+# machine-specific runtime parameters (sudo password etc.); :Z relabels for
+# SELinux-enforcing hosts (e.g. MicroOS), no-op elsewhere
+Volume=/home/robot/droid/droid/misc/parameters.py:/app/droid/misc/parameters.py:ro,Z
 StopTimeout=10
 
 [Service]
