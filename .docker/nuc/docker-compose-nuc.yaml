@@ -1,37 +1,19 @@
-version: "3"
-
-services: 
-  setup_nuc:
-    image: ghcr.io/droid-dataset/droid_nuc:${ROBOT_TYPE}
-    environment:
-      ROBOT_TYPE: ${ROBOT_TYPE}
-      LIBFRANKA_VERSION: ${LIBFRANKA_VERSION}
-      NUC_IP: ${NUC_IP}
-      ROBOT_IP: ${ROBOT_IP}
-      LAPTOP_IP: ${LAPTOP_IP}
-    volumes:
-      - ${ROOT_DIR}/droid/misc/parameters.py:/app/droid/misc/parameters.py
-      - ${ROOT_DIR}/config/${ROBOT_TYPE}/franka_hardware.yaml:/app/droid/fairo/polymetis/polymetis/conf/robot_client/franka_hardware.yaml
-      - ${ROOT_DIR}/config/${ROBOT_TYPE}/franka_panda.yaml:/app/droid/fairo/polymetis/polymetis/conf/robot_model/franka_panda.yaml
-    build: 
+services:
+  control_server:
+    image: droid_nuc:panda
+    build:
       context: ../../
       dockerfile: .docker/nuc/Dockerfile.nuc
-      args:
-        ROBOT_TYPE: ${ROBOT_TYPE}
-        LIBFRANKA_VERSION: ${LIBFRANKA_VERSION}
-        NUC_IP: ${NUC_IP}
-        ROBOT_IP: ${ROBOT_IP}
-        LAPTOP_IP: ${LAPTOP_IP}
-    devices:
-      - "/dev:/dev"
-    privileged: true
+    volumes:
+      # machine-specific runtime parameters (sudo password etc.); everything
+      # else the server needs is baked into the image
+      - ../../droid/misc/parameters.py:/app/droid/misc/parameters.py
+    # host networking: the laptop connects to the zerorpc server on :4242 and
+    # polymetis gRPC on :50051, and libfranka talks to the robot at its static IP
     network_mode: "host"
-    cap_add:
-      - SYS_NICE
+    # real-time scheduling for the 1kHz libfranka control loop
+    privileged: true
     ulimits:
       rtprio: 99
       memlock: 102400
-    deploy:
-      restart_policy: 
-        condition: any
-
+    restart: always

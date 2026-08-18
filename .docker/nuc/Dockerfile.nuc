@@ -1,81 +1,79 @@
-# pull ubuntu base image
-FROM ubuntu:bionic
+# Control-server image for the Franka Panda NUC.
+#
+# The image is fully self-contained: code, compiled libfranka/polymetis, and
+# the polymetis config (which lives in the droid/fairo submodule) are all baked
+# in at build time. Everything machine-specific enters at runtime — see
+# docker-compose-nuc.yaml and ../README.md for the runtime contract.
+#
+# Requires submodules to be checked out: git submodule update --init --recursive
 
-# build args
-ARG ROBOT_TYPE=${ROBOT_TYPE}
-ARG LIBFRANKA_VERSION=${LIBFRANKA_VERSION}
-ARG ROBOT_IP=${ROBOT_IP} 
-ARG NUC_IP=${NUC_IP}
-ARG NUC_POLYMETIS_DIR=/app/droid/fairo/polymetis
-ARG NUC_ROBOT_CONFIG_DIR=/app/config/${ROBOT_TYPE}
-ARG NUC_POLYMETIS_CONFIG_DIR=${NUC_POLYMETIS_DIR}/polymetis/conf
+# micromamba binary donor stage; fully qualified so podman/buildah resolve it too
+FROM docker.io/mambaorg/micromamba:1.5.10 AS micromamba
 
-# runtime env vars
-ENV ROBOT_TYPE=${ROBOT_TYPE}
-ENV LIBFRANKA_VERSION=${LIBFRANKA_VERSION}
-ENV ROBOT_IP=${ROBOT_IP} 
-ENV NUC_IP=${NUC_IP}
+FROM docker.io/library/ubuntu:noble
 
-# base system installations
+ARG POLYMETIS_DIR=/app/droid/fairo/polymetis
+ARG LIBFRANKA_DIR=${POLYMETIS_DIR}/polymetis/src/clients/franka_panda_client/third_party/libfranka
+
+# base system: the toolchain (gcc, make, cmake) and all libraries come from the
+# conda env. ca-certificates is required for micromamba's TLS downloads; sudo is
+# needed at runtime by droid.franka.robot's controller launches.
 RUN apt-get update && \
-    apt-get install -y software-properties-common build-essential sudo git curl wget python3-pip libspdlog-dev \
-    libeigen3-dev lsb-release ffmpeg libsm6 libxext6 && \
-    apt-get upgrade -y 
+    apt-get install -y --no-install-recommends ca-certificates sudo && \
+    rm -rf /var/lib/apt/lists/*
 
-# install latest cmake version
-RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
-    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \  
-    apt-get update && \
-    apt-get install -y cmake
+# tini as PID 1, installed per https://github.com/krallin/tini#using-tini
+ENV TINI_VERSION=v0.19.0
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
+RUN chmod +x /tini
 
-# copy project code to container
+# micromamba instead of miniconda: its libsolv solver resolves the polymetis
+# environment in ~2 minutes where the classic conda solver takes hours
+COPY --from=micromamba /bin/micromamba /usr/local/bin/micromamba
+ENV MAMBA_ROOT_PREFIX=/opt/micromamba
+
+# copy only the fairo submodule first so the conda env and the expensive
+# libfranka/polymetis builds stay cached across changes to the droid code
+# create the conda env from the explicit lockfile: no solver runs at build
+# time, every package is pinned by URL+md5, and the layer only rebuilds when
+# the lock changes. environment.lock is generated from environment.yml — see
+# its header for the regeneration command.
+COPY droid/fairo/polymetis/polymetis/environment.lock /tmp/environment.lock
+RUN micromamba create -y -n polymetis-local -f /tmp/environment.lock && \
+    micromamba clean -a -y
+
+COPY droid/fairo /app/droid/fairo
+
+# fail fast if submodules weren't checked out
+RUN test -f ${LIBFRANKA_DIR}/CMakeLists.txt && test -n "$(ls -A ${LIBFRANKA_DIR}/common)" || \
+    { echo "libfranka submodule missing or incomplete: run 'git submodule update --init --recursive' first"; exit 1; }
+
+WORKDIR ${POLYMETIS_DIR}
+RUN micromamba run -n polymetis-local pip install -e ./polymetis
+SHELL ["micromamba", "run", "-n", "polymetis-local", "/bin/bash", "-c"]
+
+# build libfranka from the checked-out submodule, pinned by fairo's gitlink to
+# 0.9.0 — the version compatible with the Panda (fr3 would need 0.10.0)
+RUN mkdir -p ${LIBFRANKA_DIR}/build && \
+    cd ${LIBFRANKA_DIR}/build && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=ON .. && \
+    cmake --build . --parallel "$(nproc)"
+
+# build polymetis
+RUN mkdir -p ./polymetis/build && \
+    cd ./polymetis/build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_FRANKA=ON -DBUILD_TESTS=OFF -DBUILD_DOCS=OFF && \
+    make -j"$(nproc)"
+
+# copy the rest of the project and install the droid package into the same env
 COPY . /app
 WORKDIR /app
+RUN pip install --no-cache-dir -e .
 
-# install miniconda 
-RUN wget \
-    https://repo.anaconda.com/miniconda/Miniconda3-py38_4.12.0-Linux-x86_64.sh \
-    && mkdir /root/.conda \
-    && bash Miniconda3-py38_4.12.0-Linux-x86_64.sh -b \
-    && rm -f Miniconda3-py38_4.12.0-Linux-x86_64.sh
-ENV PATH /root/miniconda3/bin:$PATH
+# the launch scripts in droid/franka target the bare-metal pixi setup on the
+# NUC; replace them with the conda-based equivalents for this image
+COPY .docker/nuc/launch_robot.sh .docker/nuc/launch_gripper.sh /app/droid/franka/
 
-# setup polymetis conda env
-WORKDIR ${NUC_POLYMETIS_DIR}
-RUN conda env create -f ./polymetis/environment.yml && \
-    conda run -n polymetis-local pip install -e ./polymetis
-SHELL ["conda", "run", "-n", "polymetis-local", "/bin/bash", "-c"]
-
-# build libfranka and polymetis
-RUN ./scripts/build_libfranka.sh ${LIBFRANKA_VERSION} && \
-    mkdir -p ./polymetis/build && \
-    cd ./polymetis/build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_FRANKA=ON -DBUILD_TESTS=ON -DBUILD_DOCS=ON && \
-    make -j
-
-# set polymetis config files
-WORKDIR /app
-RUN cp ${NUC_ROBOT_CONFIG_DIR}/franka_hardware.yaml ${NUC_POLYMETIS_CONFIG_DIR}/robot_client/franka_hardware.yaml && \
-    cp ${NUC_ROBOT_CONFIG_DIR}/franka_panda.yaml ${NUC_POLYMETIS_CONFIG_DIR}/robot_model/franka_panda.yaml
-
-# python environment setup 
-RUN pip3 install -e . && \
-    pip3 install dm-robotics-moma==0.5.0 --no-deps && \
-    pip3 install dm-robotics-transformations==0.5.0 --no-deps && \
-    pip3 install dm-robotics-agentflow==0.5.0 --no-deps && \
-    pip3 install dm-robotics-geometry==0.5.0 --no-deps && \
-    pip3 install dm-robotics-manipulation==0.5.0 --no-deps && \
-    pip3 install dm-robotics-controllers==0.5.0 --no-deps
-
-# using miniconda instead of anaconda so overwrite sh scripts
-RUN find /app/droid/franka -type f -name "launch_*.sh" -exec sed -i 's/anaconda/miniconda/g' {} \;
-RUN find /app/scripts/server -type f -name "launch_server.sh" -exec sed -i 's/anaconda/miniconda/g' {} \;
-
-# set absolute paths
-RUN find /app/droid/franka -type f -name "launch_*.sh" -exec sed -i 's|~|/root|g' {} \;
-RUN find /app/scripts/server -type f -name "launch_server.sh" -exec sed -i 's|~|/root|g' {} \;
-
-# start the server
-RUN chmod +x /app/scripts/server/launch_server.sh
-ENTRYPOINT ["/app/scripts/server/launch_server.sh"]
-
+ENTRYPOINT ["/tini", "--", \
+    "/usr/local/bin/micromamba", "run", "-r", "/opt/micromamba", "-n", "polymetis-local", \
+    "python", "/app/scripts/server/run_server.py"]

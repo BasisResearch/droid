@@ -174,7 +174,7 @@ cd .docker/nuc
 docker compose -f docker-compose-nuc.yaml up
 ```
 
-**Note:** you want to ensure environment variables defined in the docker compose file are exported for them to be available to the container:
+The NUC compose file is self-contained; no environment variables need to be exported.
 
 Next run the test script for collecting a trajectory on the laptop through running the test Docker container:
 
