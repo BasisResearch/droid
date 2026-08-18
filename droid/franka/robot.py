@@ -104,39 +104,46 @@ class FrankaRobot:
             if not self._controller_not_loaded:
                 run_threaded_command(helper_non_blocking)
 
+    def _gstate(self):
+        # One-line gripper state for logs. is_moving / prev_command_successful
+        # reveal the stuck-latch: a failed grasp/goto that never returns leaves
+        # is_moving=True, and the C++ run loop then skips ALL new commands.
+        try:
+            s = self._gripper.get_state()
+            return ("width=%.4f is_moving=%s is_grasped=%s prev_ok=%s"
+                    % (s.width, s.is_moving, s.is_grasped, s.prev_command_successful))
+        except Exception as e:
+            return "state?(%r)" % (e,)
+
     def update_gripper(self, command, velocity=True, blocking=False):
         if velocity:
             self._ik_solver_removed()
 
         command = float(np.clip(command, 0, 1))
-        # self._gripper.goto(width=self._max_gripper_width * (1 - command), speed=0.05, force=1.0, blocking=blocking)
         width = self._max_gripper_width * (1 - command)
-        try:
-            w0 = self._gripper.get_state().width
-        except Exception:
-            w0 = float("nan")
-        print("[gripper] goto width=%.4fm (cmd=%.3f) blocking=%s  from width=%.4fm"
-              % (width, command, blocking, w0), flush=True)
-        self._gripper.goto(width=width, speed=0.05, force=5.0, blocking=blocking)
-        try:
-            print("[gripper] goto returned; width now=%.4fm"
-                  % self._gripper.get_state().width, flush=True)
-        except Exception:
-            pass
+        print("[gripper] goto width=%.4fm (cmd=%.3f) blocking=%s  before: %s"
+              % (width, command, blocking, self._gstate()), flush=True)
+        self._gripper.goto(width=width, speed=0.05, force=0.1, blocking=blocking)
+        print("[gripper] goto returned; after: %s" % self._gstate(), flush=True)
+
+    def grasp(self, speed=0.05, force=5.0, grasp_width=0.0, blocking=True):
+        # Force grasp: close until contact and keep exerting force. Exposed over
+        # zerorpc for clients without polymetis; grips a solid object where a
+        # plain goto would just stall on it.
+        print("[gripper] grasp width=%.4f force=%.1f speed=%.3f blocking=%s  before: %s"
+              % (grasp_width, force, speed, blocking, self._gstate()), flush=True)
+        self._gripper.grasp(speed=speed, force=force, grasp_width=grasp_width, blocking=blocking)
+        print("[gripper] grasp returned; after: %s" % self._gstate(), flush=True)
 
     def stop_gripper(self, blocking=True):
         # Unstick the gripper controller: after a grasp/goto that couldn't reach
         # its target width (blocked by an object) the controller reports failure
         # and IGNORES all future commands until stopped. Call this before the
         # next goto/grasp. Requires GripperInterface.stop (fairo PR #1417).
-        try:
-            w0 = self._gripper.get_state().width
-        except:
-            w0 = float("nan")
-        print("[gripper] STOP blocking=%s  from width=%.4fm" % (blocking, w0), flush=True)
+        print("[gripper] STOP blocking=%s  before: %s" % (blocking, self._gstate()), flush=True)
         self._gripper.stop(blocking=blocking)
-        print("[gripper] STOP returned (unstick sent)", flush=True)
-          
+        print("[gripper] STOP returned; after: %s" % self._gstate(), flush=True)
+
     def add_noise_to_joints(self, original_joints, cartesian_noise):
         original_joints = torch.Tensor(original_joints)
 

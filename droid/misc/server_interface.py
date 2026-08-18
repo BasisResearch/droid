@@ -61,6 +61,12 @@ class ServerInterface:
     def update_gripper(self, command, velocity=True, blocking=False):
         self.server.update_gripper(command, velocity, blocking)
 
+    def grasp(self, speed=0.05, force=5.0, grasp_width=0.0, blocking=True):
+        self.server.grasp(speed, force, grasp_width, blocking)
+
+    def stop_gripper(self, blocking=False):
+        self.server.stop_gripper(blocking)
+
     def get_ee_pose(self):
         return np.array(self.server.get_ee_pose())
 
