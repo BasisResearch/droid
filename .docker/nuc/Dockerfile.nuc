@@ -32,12 +32,6 @@ RUN chmod +x /tini
 COPY --from=micromamba /bin/micromamba /usr/local/bin/micromamba
 ENV MAMBA_ROOT_PREFIX=/opt/micromamba
 
-# copy only the fairo submodule first so the conda env and the expensive
-# libfranka/polymetis builds stay cached across changes to the droid code
-# create the conda env from the explicit lockfile: no solver runs at build
-# time, every package is pinned by URL+md5, and the layer only rebuilds when
-# the lock changes. environment.lock is generated from environment.yml — see
-# its header for the regeneration command.
 COPY droid/fairo/polymetis/polymetis/environment.lock /tmp/environment.lock
 RUN micromamba create -y -n polymetis-local -f /tmp/environment.lock && \
     micromamba clean -a -y
@@ -50,25 +44,22 @@ RUN test -f ${LIBFRANKA_DIR}/CMakeLists.txt && test -n "$(ls -A ${LIBFRANKA_DIR}
 
 WORKDIR ${POLYMETIS_DIR}
 RUN micromamba run -n polymetis-local pip install -e ./polymetis
-SHELL ["micromamba", "run", "-n", "polymetis-local", "/bin/bash", "-c"]
 
 # build libfranka from the checked-out submodule, pinned by fairo's gitlink to
 # 0.9.0 — the version compatible with the Panda (fr3 would need 0.10.0)
-RUN mkdir -p ${LIBFRANKA_DIR}/build && \
-    cd ${LIBFRANKA_DIR}/build && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=ON .. && \
-    cmake --build . --parallel "$(nproc)"
+WORKDIR ${LIBFRANKA_DIR}/build
+RUN micromamba run -n polymetis-local cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=ON ..
+RUN micromamba run -n polymetis-local cmake --build . --parallel "$(nproc)"
 
 # build polymetis
-RUN mkdir -p ./polymetis/build && \
-    cd ./polymetis/build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_FRANKA=ON -DBUILD_TESTS=OFF -DBUILD_DOCS=OFF && \
-    make -j"$(nproc)"
+WORKDIR ${POLYMETIS_DIR}/polymetis/build
+RUN micromamba run -n polymetis-local cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_FRANKA=ON -DBUILD_TESTS=OFF -DBUILD_DOCS=OFF
+RUN micromamba run -n polymetis-local make -j"$(nproc)"
 
 # copy the rest of the project and install the droid package into the same env
 COPY . /app
 WORKDIR /app
-RUN pip install --no-cache-dir -e .
+RUN micromamba run -n polymetis-local pip install --no-cache-dir -e .
 
 # the launch scripts in droid/franka target the bare-metal pixi setup on the
 # NUC; replace them with the conda-based equivalents for this image
