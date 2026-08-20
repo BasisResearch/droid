@@ -19,7 +19,6 @@ def log_effective_config():
     log.info("droid parameters from %s", parameters.__file__)
     for name in ("robot_type", "robot_serial_number", "nuc_ip", "robot_ip", "laptop_ip"):
         log.info("  %s = %r", name, getattr(parameters, name, None))
-    log.info("  sudo_password is %s", "set" if parameters.sudo_password else "EMPTY")
 
     for rel, robot_ip_key in (
         ("robot_client/franka_hardware.yaml", ("robot_client", "executable_cfg", "robot_ip")),
@@ -43,6 +42,11 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s %(message)s")
     log_effective_config()
     robot_client = FrankaRobot()
+    try:
+        robot_client.launch_robot()
+        log.info("connected to robot and gripper controllers")
+    except Exception as e:
+        log.warning("controllers not reachable yet (%s); will retry on each call", e)
     s = zerorpc.Server(robot_client)
     s.bind("tcp://0.0.0.0:4242")
     log.info("serving on tcp://0.0.0.0:4242")

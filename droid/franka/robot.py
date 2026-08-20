@@ -1,5 +1,4 @@
 # ROBOT SPECIFIC IMPORTS
-import os
 import time
 
 import grpc
@@ -7,39 +6,67 @@ import numpy as np
 import torch
 from polymetis import GripperInterface, RobotInterface
 
-from droid.misc.parameters import sudo_password
-from droid.misc.subprocess_utils import run_terminal_command, run_threaded_command
+from droid.misc.subprocess_utils import run_threaded_command
 
 # UTILITY SPECIFIC IMPORTS
 from droid.misc.transformations import add_poses, euler_to_quat, quat_to_euler
 
 
 class FrankaRobot:
-    def launch_controller(self):
-        try:
-            self.kill_controller()
-        except:
-            pass
-
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        self._robot_process = run_terminal_command(
-            "echo " + sudo_password + " | sudo -S " + "bash " + dir_path + "/launch_robot.sh"
-        )
-        self._gripper_process = run_terminal_command(
-            "echo " + sudo_password + " | sudo -S " + "bash " + dir_path + "/launch_gripper.sh"
-        )
-        self._server_launched = True
-        time.sleep(5)
-
-    def launch_robot(self):
-        self._robot = RobotInterface(ip_address="localhost")
-        self._gripper = GripperInterface(ip_address="localhost")
-        self._max_gripper_width = 0.08  # self._gripper.metadata.max_width
+    def __init__(self):
+        self._robot = None
+        self._gripper = None
+        self._max_gripper_width = 0.08  # gripper.metadata.max_width
         self._controller_not_loaded = False
 
+    def launch_controller(self):
+        # No-op kept for zerorpc API compatibility: the robot and gripper
+        # controllers are long-running services supervised on the NUC, so
+        # clients connecting with launch=True must no longer kill and respawn
+        # them. Restart a wedged controller on the NUC via systemctl instead.
+        pass
+
     def kill_controller(self):
-        self._robot_process.kill()
-        self._gripper_process.kill()
+        # No-op: see launch_controller.
+        pass
+
+    def launch_robot(self):
+        self._ensure_connected()
+
+    def is_ready(self):
+        # Whether both controllers are currently reachable; lets clients poll
+        # instead of crashing into a RemoteError while the robot is off.
+        try:
+            self._ensure_connected()
+            self._robot.get_robot_state()
+            self._gripper.get_state()
+            return True
+        except Exception:
+            return False
+
+    def _ensure_connected(self):
+        # The controller services only come up once the robot is powered on,
+        # and can die and be restarted underneath us (robot power-cycled), so
+        # connect lazily and leave a clean retry path for the next call.
+        if self._robot is None:
+            try:
+                self._robot = RobotInterface(ip_address="localhost")
+            except Exception as e:
+                raise RuntimeError("robot controller not reachable (is the robot powered on?): %r" % (e,))
+
+        # GripperInterface construction succeeds even with its server down, so
+        # probe with a direct get_state call. Its command-executor thread dies
+        # permanently once a queued command hits a gRPC error — after which
+        # every blocking command would hang on the queue — so reconnect then.
+        if self._gripper is not None and not self._gripper._command_thr.is_alive():
+            self._gripper = None
+        if self._gripper is None:
+            gripper = GripperInterface(ip_address="localhost")
+            try:
+                gripper.get_state()
+            except Exception as e:
+                raise RuntimeError("gripper controller not reachable: %r" % (e,))
+            self._gripper = gripper
 
     def _ik_solver_removed(self):
         raise NotImplementedError(
@@ -49,6 +76,7 @@ class FrankaRobot:
         )
 
     def update_command(self, command, action_space="cartesian_velocity", gripper_action_space=None, blocking=False):
+        self._ensure_connected()
         action_dict = self.create_action_dict(command, action_space=action_space, gripper_action_space=gripper_action_space)
 
         self.update_joints(action_dict["joint_position"], velocity=False, blocking=blocking)
@@ -57,6 +85,7 @@ class FrankaRobot:
         return action_dict
 
     def update_pose(self, command, velocity=False, blocking=False):
+        self._ensure_connected()
         if velocity or not blocking:
             self._ik_solver_removed()
 
@@ -67,6 +96,7 @@ class FrankaRobot:
         self.update_joints(desired_joints, velocity=False, blocking=True)
 
     def update_joints(self, command, velocity=False, blocking=False, cartesian_noise=None):
+        self._ensure_connected()
         if velocity:
             self._ik_solver_removed()
         if cartesian_noise is not None:
@@ -116,6 +146,7 @@ class FrankaRobot:
             return "state?(%r)" % (e,)
 
     def update_gripper(self, command, velocity=True, blocking=False):
+        self._ensure_connected()
         if velocity:
             self._ik_solver_removed()
 
@@ -130,6 +161,7 @@ class FrankaRobot:
         # Force grasp: close until contact and keep exerting force. Exposed over
         # zerorpc for clients without polymetis; grips a solid object where a
         # plain goto would just stall on it.
+        self._ensure_connected()
         print("[gripper] grasp width=%.4f force=%.1f speed=%.3f blocking=%s  before: %s"
               % (grasp_width, force, speed, blocking, self._gstate()), flush=True)
         self._gripper.grasp(speed=speed, force=force, grasp_width=grasp_width, blocking=blocking)
@@ -140,6 +172,7 @@ class FrankaRobot:
         # its target width (blocked by an object) the controller reports failure
         # and IGNORES all future commands until stopped. Call this before the
         # next goto/grasp. Requires GripperInterface.stop (fairo PR #1417).
+        self._ensure_connected()
         print("[gripper] STOP blocking=%s  before: %s" % (blocking, self._gstate()), flush=True)
         self._gripper.stop(blocking=blocking)
         print("[gripper] STOP returned; after: %s" % self._gstate(), flush=True)
@@ -164,20 +197,25 @@ class FrankaRobot:
         return desired_joints.tolist()
 
     def get_joint_positions(self):
+        self._ensure_connected()
         return self._robot.get_joint_positions().tolist()
 
     def get_joint_velocities(self):
+        self._ensure_connected()
         return self._robot.get_joint_velocities().tolist()
 
     def get_gripper_position(self):
+        self._ensure_connected()
         return 1 - (self._gripper.get_state().width / self._max_gripper_width)
 
     def get_ee_pose(self):
+        self._ensure_connected()
         pos, quat = self._robot.get_ee_pose()
         angle = quat_to_euler(quat.numpy())
         return np.concatenate([pos, angle]).tolist()
 
     def get_robot_state(self):
+        self._ensure_connected()
         robot_state = self._robot.get_robot_state()
         gripper_position = self.get_gripper_position()
         pos, quat = self._robot.robot_model.forward_kinematics(torch.Tensor(robot_state.joint_positions))
