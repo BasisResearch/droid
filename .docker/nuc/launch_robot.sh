@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
-set -e
-
 # Container replacement for droid/franka/launch_robot.sh (which targets the
-# bare-metal pixi setup). Invoked by droid.franka.robot through `sudo -S bash`,
-# which strips the environment — hence the absolute micromamba path and the
-# explicit root prefix. robot_ip and controller settings come from the
-# polymetis conf baked into the image (droid/fairo/polymetis/polymetis/conf).
-exec /usr/local/bin/micromamba run -r /opt/micromamba -n polymetis-local \
-  env HYDRA_FULL_ERROR=1 \
+# bare-metal pixi setup), run as the droid-robot quadlet unit. Wrapped in
+# supervise_launch.sh so the service waits for the robot to become reachable
+# instead of dying while it is off. robot_ip and controller settings come from
+# the polymetis conf baked into the image (droid/fairo/polymetis/polymetis/conf).
+exec "$(dirname "$0")/supervise_launch.sh" 1337 \
   launch_robot.py robot_client=franka_hardware

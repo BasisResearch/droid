@@ -63,7 +63,7 @@ RUN micromamba run -n polymetis-local pip install --no-cache-dir -e .
 
 # the launch scripts in droid/franka target the bare-metal pixi setup on the
 # NUC; replace them with the conda-based equivalents for this image
-COPY .docker/nuc/launch_robot.sh .docker/nuc/launch_gripper.sh /app/droid/franka/
+COPY .docker/nuc/launch_robot.sh .docker/nuc/launch_gripper.sh .docker/nuc/supervise_launch.sh /app/droid/franka/
 
 ENTRYPOINT ["/tini", "--", \
     "/usr/local/bin/micromamba", "run", "-r", "/opt/micromamba", "-n", "polymetis-local", \
