@@ -21,6 +21,19 @@ RESTART_DELAY=5
 STARTUP_GRACE=30
 CHECK_INTERVAL=2
 
+# Refuse malformed invocations loudly: an argument-signature mismatch with the
+# wrapper scripts would otherwise degrade into `env` printing the environment
+# and "succeeding", which loops silently forever.
+usage_error() {
+    echo "[supervise] BAD ARGUMENTS: $1" >&2
+    echo "[supervise] usage: supervise_launch.sh <fci_port> <server_port> <client_comm> <launcher> [args...]" >&2
+    exit 64
+}
+[ $# -ge 4 ] || usage_error "expected at least 4 arguments, got $#"
+case $1 in *[!0-9]*|'') usage_error "fci_port '$1' is not a number";; esac
+case $2 in *[!0-9]*|'') usage_error "server_port '$2' is not a number";; esac
+case $4 in *=*) usage_error "launcher '$4' looks like a VAR=value assignment";; esac
+
 FCI_PORT=$1
 SERVER_PORT=$2
 CLIENT_COMM=$3
