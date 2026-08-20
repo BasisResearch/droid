@@ -20,7 +20,7 @@ ARG LIBFRANKA_DIR=${POLYMETIS_DIR}/polymetis/src/clients/franka_panda_client/thi
 # needed at runtime by polymetis' realtime server launch; procps (pgrep) and
 # psmisc (fuser) by supervise_launch.sh's stale-process reaping.
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates sudo procps psmisc && \
+    apt-get install -y --no-install-recommends ca-certificates sudo procps psmisc nano && \
     rm -rf /var/lib/apt/lists/*
 
 # tini as PID 1, installed per https://github.com/krallin/tini#using-tini
