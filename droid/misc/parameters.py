@@ -1,5 +1,5 @@
 import os
-from cv2 import aruco
+# from cv2 import aruco
 
 # Robot Params #
 # Defaults only: the NUC_IP / ROBOT_IP / LAPTOP_IP environment variables
@@ -30,7 +30,7 @@ CHARUCOBOARD_ROWCOUNT = 9
 CHARUCOBOARD_COLCOUNT = 14
 CHARUCOBOARD_CHECKER_SIZE = 0.020
 CHARUCOBOARD_MARKER_SIZE = 0.016
-ARUCO_DICT = aruco.Dictionary_get(aruco.DICT_5X5_100)
+#ARUCO_DICT = aruco.Dictionary_get(aruco.DICT_5X5_100)
 
 # Ubuntu Pro Token (RT PATCH) #
 ubuntu_pro_token = ""
