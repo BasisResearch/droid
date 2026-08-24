@@ -64,9 +64,10 @@ PARAMETERS_FILE="$(git rev-parse --show-toplevel)/droid/misc/parameters.py"
 awk -F'[[:space:]]*=[[:space:]]*' '/^[[:space:]]*([[:alnum:]_]+)[[:space:]]*=/ && $1 != "ARUCO_DICT" { gsub("\"", "", $2); print "export " $1 "=" $2 }' "$PARAMETERS_FILE" > temp_env_vars.sh
 source temp_env_vars.sh
 export ROOT_DIR=$(git rev-parse --show-toplevel)
-export NUC_IP=$nuc_ip
-export ROBOT_IP=$robot_ip
-export LAPTOP_IP=$laptop_ip
+# already-exported IPs (e.g. from ansible) win over the parameters.py defaults
+export NUC_IP=${NUC_IP:-$nuc_ip}
+export ROBOT_IP=${ROBOT_IP:-$robot_ip}
+export LAPTOP_IP=${LAPTOP_IP:-$laptop_ip}
 export SUDO_PASSWORD=$sudo_password
 export ROBOT_TYPE=$robot_type
 export ROBOT_SERIAL_NUMBER=$robot_serial_number

@@ -4,6 +4,12 @@ services:
     build:
       context: ../../
       dockerfile: .docker/nuc/Dockerfile.nuc
+    # machine IPs: override the defaults in parameters.py; empty (unset on the
+    # host) falls back to the file's values
+    environment:
+      ROBOT_IP: ${ROBOT_IP:-}
+      NUC_IP: ${NUC_IP:-}
+      LAPTOP_IP: ${LAPTOP_IP:-}
     volumes:
       # machine-specific runtime parameters (sudo password etc.); everything
       # else the server needs is baked into the image

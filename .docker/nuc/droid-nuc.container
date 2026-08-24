@@ -29,6 +29,11 @@ Ulimit=memlock=-1:-1
 # machine-specific runtime parameters (sudo password etc.); :Z relabels for
 # SELinux-enforcing hosts (e.g. MicroOS), no-op elsewhere
 Volume=/home/robot/droid/droid/misc/parameters.py:/app/droid/misc/parameters.py:ro,Z
+# machine IPs: ROBOT_IP/NUC_IP/LAPTOP_IP override the parameters.py defaults;
+# set them here (ansible templates these lines) the same way the droid-robot
+# and droid-gripper units set ROBOT_IP for the launch wrappers
+# Environment=ROBOT_IP=172.16.0.4
+# Environment=NUC_IP=172.16.0.2
 StopTimeout=10
 
 [Service]
