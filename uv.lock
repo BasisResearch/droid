@@ -2449,12 +2449,6 @@ dependencies = [
     { name = "boto3", version = "1.42.97", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.9.*'" },
     { name = "boto3", version = "1.43.73", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "customtkinter" },
-    { name = "dm-robotics-agentflow" },
-    { name = "dm-robotics-controllers" },
-    { name = "dm-robotics-geometry" },
-    { name = "dm-robotics-manipulation" },
-    { name = "dm-robotics-moma" },
-    { name = "dm-robotics-transformations" },
     { name = "gym" },
     { name = "h5py", version = "3.8.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.8'" },
     { name = "h5py", version = "3.11.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.8.*'" },
@@ -2506,6 +2500,14 @@ dev = [
     { name = "pre-commit", version = "4.6.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "ruff" },
 ]
+dm-robotics = [
+    { name = "dm-robotics-agentflow" },
+    { name = "dm-robotics-controllers" },
+    { name = "dm-robotics-geometry" },
+    { name = "dm-robotics-manipulation" },
+    { name = "dm-robotics-moma" },
+    { name = "dm-robotics-transformations" },
+]
 postprocessing = [
     { name = "scikit-image", version = "0.19.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.8'" },
     { name = "scikit-image", version = "0.21.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.8.*'" },
@@ -2519,12 +2521,12 @@ requires-dist = [
     { name = "black", extras = ["jupyter"], marker = "extra == 'dev'" },
     { name = "boto3" },
     { name = "customtkinter" },
-    { name = "dm-robotics-agentflow", specifier = "==0.5.0" },
-    { name = "dm-robotics-controllers", specifier = "==0.5.0" },
-    { name = "dm-robotics-geometry", specifier = "==0.5.0" },
-    { name = "dm-robotics-manipulation", specifier = "==0.5.0" },
-    { name = "dm-robotics-moma", specifier = "==0.5.0" },
-    { name = "dm-robotics-transformations", specifier = "==0.5.0" },
+    { name = "dm-robotics-agentflow", marker = "extra == 'dm-robotics'", specifier = "==0.5.0" },
+    { name = "dm-robotics-controllers", marker = "extra == 'dm-robotics'", specifier = "==0.5.0" },
+    { name = "dm-robotics-geometry", marker = "extra == 'dm-robotics'", specifier = "==0.5.0" },
+    { name = "dm-robotics-manipulation", marker = "extra == 'dm-robotics'", specifier = "==0.5.0" },
+    { name = "dm-robotics-moma", marker = "extra == 'dm-robotics'", specifier = "==0.5.0" },
+    { name = "dm-robotics-transformations", marker = "extra == 'dm-robotics'", specifier = "==0.5.0" },
     { name = "gym" },
     { name = "h5py" },
     { name = "imageio" },
@@ -2544,7 +2546,7 @@ requires-dist = [
     { name = "tqdm" },
     { name = "zerorpc" },
 ]
-provides-extras = ["dev", "postprocessing"]
+provides-extras = ["dev", "postprocessing", "dm-robotics"]
 
 [[package]]
 name = "exceptiongroup"

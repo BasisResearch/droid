@@ -28,12 +28,6 @@ dependencies = [
     "scipy",
     "tqdm",
     "zerorpc",
-    "dm-robotics-moma==0.5.0",
-    "dm-robotics-transformations==0.5.0",
-    "dm-robotics-agentflow==0.5.0",
-    "dm-robotics-geometry==0.5.0",
-    "dm-robotics-manipulation==0.5.0",
-    "dm-robotics-controllers==0.5.0",
     "numpy<2",
 ]
 
@@ -46,6 +40,16 @@ dev = [
 ]
 postprocessing = [
     "scikit-image",
+]
+# nothing in droid imports these directly; the laptop Dockerfiles install the
+# same set with pip --no-deps
+dm-robotics = [
+    "dm-robotics-moma==0.5.0",
+    "dm-robotics-transformations==0.5.0",
+    "dm-robotics-agentflow==0.5.0",
+    "dm-robotics-geometry==0.5.0",
+    "dm-robotics-manipulation==0.5.0",
+    "dm-robotics-controllers==0.5.0",
 ]
 
 [project.urls]

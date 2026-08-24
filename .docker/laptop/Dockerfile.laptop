@@ -1,10 +1,11 @@
 FROM nvidia/cuda:12.1.0-devel-ubuntu22.04
 
 # build args
+# no ROBOT_IP/NUC_IP here: inside the container a build-time ENV would shadow
+# the defaults in the bind-mounted parameters.py; the IPs come from the
+# runtime environment (docker-compose / ansible) or from parameters.py itself
 ARG ROBOT_TYPE=${ROBOT_TYPE}
 ARG LIBFRANKA_VERSION=${LIBFRANKA_VERSION}
-ARG ROBOT_IP=${ROBOT_IP}
-ARG NUC_IP=${NUC_IP}
 ARG NUC_ROBOT_CONFIG_DIR=/app/config/${ROBOT_TYPE}
 ARG NUC_OCULUS_DIR=/app/droid/oculus_reader
 ARG NUC_POLYMETIS_DIR=/app/droid/fairo/polymetis
@@ -13,8 +14,6 @@ ARG NUC_POLYMETIS_CONFIG_DIR=${NUC_POLYMETIS_DIR}/polymetis/conf
 # runtime env vars
 ENV ROBOT_TYPE=${ROBOT_TYPE}
 ENV LIBFRANKA_VERSION=${LIBFRANKA_VERSION}
-ENV ROBOT_IP=${ROBOT_IP}
-ENV NUC_IP=${NUC_IP}
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES \
     ${NVIDIA_DRIVER_CAPABILITIES:+$NVIDIA_DRIVER_CAPABILITIES,}compute,video,utility

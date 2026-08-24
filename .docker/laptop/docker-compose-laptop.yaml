@@ -9,9 +9,11 @@ services:
       XAUTHORITY: ${DOCKER_XAUTH}
       ROBOT_TYPE: ${ROBOT_TYPE}
       LIBFRANKA_VERSION: ${LIBFRANKA_VERSION}
-      NUC_IP: ${NUC_IP}
-      ROBOT_IP: ${ROBOT_IP}
-      LAPTOP_IP: ${LAPTOP_IP}
+      # machine IPs: override the defaults in the bind-mounted parameters.py;
+      # empty (unset on the host) falls back to the file's values
+      NUC_IP: ${NUC_IP:-}
+      ROBOT_IP: ${ROBOT_IP:-}
+      LAPTOP_IP: ${LAPTOP_IP:-}
       NVIDIA_VISIBLE_DEVICES: all
       ANDROID_ADB_SERVER_ADDRESS: host.docker.internal
     volumes:
@@ -27,8 +29,6 @@ services:
       args:
         ROOT_DIR: ${ROOT_DIR}
         ROBOT_TYPE: ${ROBOT_TYPE}
-        NUC_IP: ${NUC_IP}
-        ROBOT_IP: ${ROBOT_IP}
     devices:
       - "/dev:/dev"
     runtime: nvidia
