@@ -230,6 +230,12 @@ class FrankaRobot:
             "prev_joint_torques_computed": list(robot_state.prev_joint_torques_computed),
             "prev_joint_torques_computed_safened": list(robot_state.prev_joint_torques_computed_safened),
             "motor_torques_measured": list(robot_state.motor_torques_measured),
+            # libfranka's tau_ext_hat_filtered, filled every cycle by
+            # franka_panda_client.cpp. The link-side external-torque estimate
+            # that a guarded press needs: the measured-minus-computed residual
+            # reads ~37 N at rest on this bench, which no contact threshold
+            # can sit above.
+            "motor_torques_external": list(robot_state.motor_torques_external),
             "prev_controller_latency_ms": robot_state.prev_controller_latency_ms,
             "prev_command_successful": robot_state.prev_command_successful,
         }
