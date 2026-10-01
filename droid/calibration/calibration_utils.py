@@ -126,7 +126,7 @@ class CharucoDetector:
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         else:
             raise ValueError
-        img_size = image.shape[:2]
+        img_size = image.shape[1], image.shape[0]  # OpenCV sizes are (width, height)
 
         # Find Aruco Markers In Image #
         corners, ids, rejected = aruco.detectMarkers(image=gray, dictionary=ARUCO_DICT, parameters=detector_params)
@@ -155,6 +155,8 @@ class CharucoDetector:
         return corners, charuco_corners, charuco_ids, img_size
 
     def add_sample(self, cam_id, image, pose):
+        # process_image refines markers with this view's intrinsics.
+        self._curr_cam_id = cam_id
         readings = self.process_image(image)
         if readings is None:
             return
